@@ -182,7 +182,7 @@ router.post('/DeleteFile', function (req, res, next) {
                         FileModal.deleteMany({ 
                             "path_to_current": { $regex: file_guid } 
                         }).then(del => {
-                            fs.rmdirSync(`public/user_content/${file.path_to_current}`);
+                            fs.rmdirSync(`public/user_content/${file.path_to_current}`, { recursive: true, force: true });
                             res.json({
                                 IsSuccess: true
                             });
