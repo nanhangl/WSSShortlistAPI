@@ -440,4 +440,71 @@ router.post('/UploadFile', file_upload.single('file_content'), function (req, re
     };
 });
 
+/* POST DownloadFile */
+router.post('/DownloadFile', file_upload.single('file_content'), function (req, res, next) {
+    try {
+        const { user_no, file_name, file_guid, parent_dir_guid } = req.body;
+        if (user_no) {
+            if (file_name) {
+                if (file_guid) {
+                    if (parent_dir_guid) {
+                        User.findOne({
+                            user_no
+                        }).then(user => {
+                            if (user) {
+                                FileModal.findOne({
+                                    user_id: user._id,
+                                    file_name,
+                                    guid: file_guid,
+                                    parent_dir_guid
+                                }).then(file => {
+                                    if (file) {
+                                        res.json({
+                                            IsSuccess: true,
+                                            Result: {
+                                                url: `${req.headers.host}/user_content/${file.path_to_current}`
+                                            }
+                                        });
+                                    } else {
+                                        res.json({
+                                            IsSuccess: false,
+                                            ErrMsg:"no such file"
+                                        });
+                                    };
+                                });
+                            } else {
+                                res.json({
+                                    IsSuccess: false,
+                                    ErrMsg:"no such user"
+                                });
+                            };
+                        });
+                    } else {
+                        res.json({
+                            IsSuccess: false,
+                            ErrMsg:"parent_dir_guid can't be empty"
+                        });
+                    };
+                } else {
+                    res.json({
+                        IsSuccess: false,
+                        ErrMsg:"file_guid can't be empty"
+                    });
+                };
+            } else {
+                res.json({
+                    IsSuccess: false,
+                    ErrMsg:"file_name can't be empty"
+                });
+            };
+        } else {
+            res.json({
+                IsSuccess: false,
+                ErrMsg:"user_no can't be empty"
+            });
+        };
+    } catch (err) {
+
+    };
+});
 module.exports = router;
