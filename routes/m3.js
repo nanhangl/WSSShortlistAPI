@@ -20,6 +20,17 @@ var profile_photo_storage = multer.diskStorage({
     }
 });
 
+var file_upload_storage = multer.diskStorage({
+    destination: function (req, file, cb) {
+        cb(null, 'public/user_content/tmp')
+    },
+    filename: function (req, file, cb) {
+      const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+      const ext = path.extname(file.originalname);
+      cb(null, file.fieldname + '-' + uniqueSuffix + ext);
+    }
+});
+
 var profile_photo = multer({ 
     storage: profile_photo_storage,
     fileFilter: function (req, file, callback) {
@@ -29,6 +40,10 @@ var profile_photo = multer({
         }
         callback(null, true);
     },
+});
+
+var file_upload = multer({ 
+    storage: file_upload_storage,
 });
 
 /* GET GetUserInfo */
@@ -67,9 +82,9 @@ router.get('/GetUserInfo', function (req, res, next) {
 
 /* POST UpdateUserInfo */
 router.post('/UpdateUserInfo', profile_photo.single('photo'), function (req, res, next) {
+    var photo = req.file;
     try {
         var { user_no, user_name } = req.body;
-        var photo = req.file;
         if (user_no) {
             User.findOne({
                 user_no
@@ -117,30 +132,22 @@ router.post('/FileList', function (req, res, next) {
                 user_no
             }).then(async user => {
                 if (user) {
-                    try {
-                        fs.readdir(`public/user_content/${user_id}`, (err, files) => {
-                            if (err) {
-                                res.json({
-                                    IsSuccess: false,
-                                    ErrMsg: 'no such directory'
-                                });
-                            } else {
-                                console.log(files);
-                                res.json({
-                                    IsSuccess: true,
-                                    Result: {
-            
-                                    }
-                                });
-                            }
+                    if (parent_dir_guid) {
+                        FileModal.find({
+                            parent_dir_guid
+                        }).then(files => {
+                            console.log(files);
+                            res.json({
+                                IsSuccess: true,
+                                Result: files
+                            });
                         });
-                    } catch (err) {
-                        console.log(err)
+                    } else {
                         res.json({
                             IsSuccess: false,
-                            ErrMsg: 'unknown error'
+                            ErrMsg: "parent_dir_guid can't be empty"
                         });
-                    }
+                    };
                 } else {
                     res.json({
                         IsSuccess: false,
@@ -174,13 +181,15 @@ router.post('/NewFolder', function (req, res, next) {
                     if (user) {
                         if (parent_dir_guid) {
                             FileModal.findOne({
-                                guid: parent_dir_guid
+                                guid: parent_dir_guid,
+                                user_id: user._id
                             }).then(parent => {
                                 if (parent) {
                                     FileModal.create({
                                         file_name,
                                         is_dir: true,
                                         is_root: false,
+                                        parent_dir_guid,
                                         user_id: user._id
                                     }).then(file => {
                                         file.path_to_current = `${parent.path_to_current}/${file.guid}`;
@@ -267,7 +276,8 @@ router.post('/NewFile', function (req, res, next) {
                     }).then(user => {
                         if (user) {
                             FileModal.findOne({
-                                guid: parent_dir_guid
+                                guid: parent_dir_guid,
+                                user_id: user._id
                             }).then(parent => {
                                 if (parent) {
                                     if (parent.is_dir) {
@@ -275,11 +285,13 @@ router.post('/NewFile', function (req, res, next) {
                                             file_name,
                                             is_dir: false,
                                             is_root: false,
+                                            parent_dir_guid,
                                             user_id: user._id
                                         }).then(file => {
                                             file.path_to_current = `${parent.path_to_current}/${file.guid}`;
                                             file.save();
-                                            fs.mkdir(`public/user_content/${parent.path_to_current}/${file.guid}`, (err, dir) => {
+                                            fs.open(`public/user_content/${parent.path_to_current}/${file.guid}`, 'w', (err, newFile) => {
+                                                fs.closeSync(newFile);
                                                 if (err) {
                                                     res.json({
                                                         IsSuccess: false,
@@ -331,6 +343,96 @@ router.post('/NewFile', function (req, res, next) {
             });
         };
     } catch (err) {
+        res.json({
+            IsSuccess: false,
+            ErrMsg: err
+        });
+    };
+});
+
+/* POST UploadFile */
+router.post('/UploadFile', file_upload.single('file_content'), function (req, res, next) {
+    const file_content = req.file;
+    try {
+        const { user_no, file_name, parent_dir_guid } = req.body;
+        if (user_no) {
+            if (file_name) {
+                if (parent_dir_guid) {
+                    if (file_content) {
+                        User.findOne({
+                            user_no
+                        }).then(user => {
+                            if (user) {
+                                FileModal.findOne({
+                                    guid: parent_dir_guid,
+                                    user_id: user._id
+                                }).then(parent => {
+                                    if (parent) {
+                                        if (parent.is_dir) {
+                                            FileModal.create({
+                                                file_name,
+                                                is_dir: false,
+                                                is_root: false,
+                                                parent_dir_guid,
+                                                user_id: user._id
+                                            }).then(file => {
+                                                file.path_to_current = `${parent.path_to_current}/${file.guid}`;
+                                                file.save();
+                                                fs.renameSync(file_content.path, `public/user_content/${parent.path_to_current}/${file.guid}`);
+                                                res.json({
+                                                    IsSuccess: true
+                                                });
+                                            });
+                                        } else {
+                                            res.json({
+                                                IsSuccess: false,
+                                                ErrMsg:"parent not directory"
+                                            });
+                                        }
+                                    } else {
+                                        res.json({
+                                            IsSuccess: false,
+                                            ErrMsg:"no such parent"
+                                        });
+                                    };
+                                });
+                            } else {
+                                fs.rm(file_content.path, () => {});
+                                res.json({
+                                    IsSuccess: false,
+                                    ErrMsg:"no such user"
+                                });
+                            };
+                        });
+                    } else {
+                        res.json({
+                            IsSuccess: false,
+                            ErrMsg:"file_content can't be empty"
+                        });
+                    };
+                } else {
+                    fs.rm(file_content.path, () => {});
+                    res.json({
+                        IsSuccess: false,
+                        ErrMsg:"parent_dir_guid can't be empty"
+                    });
+                };
+            } else {
+                fs.rm(file_content.path, () => {});
+                res.json({
+                    IsSuccess: false,
+                    ErrMsg:"file_name can't be empty"
+                });
+            };
+        } else {
+            fs.rm(file_content.path, () => {});
+            res.json({
+                IsSuccess: false,
+                ErrMsg:"user_no can't be empty"
+            });
+        };
+    } catch (err) {
+        fs.rm(file_content.path, () => {});
         res.json({
             IsSuccess: false,
             ErrMsg: err
