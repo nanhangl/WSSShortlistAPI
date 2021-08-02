@@ -5,23 +5,31 @@ const File = mongoose.model('Files', {
     guid: {
         type: String,
         default: uuid.v4,
-        required: true
+        required: true,
+        unique: true
     },
     file_name: {
         type: String,
         required: true
     },
     is_dir: {
-        type: String,
+        type: Boolean,
         required: true
     },
     is_root: {
-        type: String,
+        type: Boolean,
         required: true
     },
-    parent_guid: {
+    parent_dir_guid: {
         type: String
+    },
+    path_to_current: {
+        type: String
+    },
+    user_id: {
+        type: String,
+        required: true
     }
 });
 
-module.exports = User;
+module.exports = File;

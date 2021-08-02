@@ -7,6 +7,7 @@ var jwt = require('jsonwebtoken');
 var multer  = require('multer')
 const secrets = require('../secrets');
 var User = require('../nosqlmodals/User');
+var FileModal = require('../nosqlmodals/File');
 
 var profile_photo_storage = multer.diskStorage({
     destination: function (req, file, cb) {
@@ -147,6 +148,99 @@ router.post('/FileList', function (req, res, next) {
                     });
                 };
             });
+        } else {
+            res.json({
+                IsSuccess: false,
+                ErrMsg:"user_no can't be empty"
+            });
+        };
+    } catch (err) {
+        res.json({
+            IsSuccess: false,
+            ErrMsg: err
+        });
+    };
+});
+
+/* POST NewFolder */
+router.post('/NewFolder', function (req, res, next) {
+    try {
+        const { user_no, file_name, parent_dir_guid } = req.body;
+        if (user_no) {
+            if (file_name) {
+                User.findOne({
+                    user_no
+                }).then(user => {
+                    if (user) {
+                        if (parent_dir_guid) {
+                            FileModal.findOne({
+                                guid: parent_dir_guid
+                            }).then(parent => {
+                                if (parent) {
+                                    FileModal.create({
+                                        file_name,
+                                        is_dir: true,
+                                        is_root: false,
+                                        user_id: user._id
+                                    }).then(file => {
+                                        file.path_to_current = `${parent.path_to_current}/${file.guid}`;
+                                        file.save();
+                                        fs.mkdir(`public/user_content/${parent.path_to_current}/${file.guid}`, (err, dir) => {
+                                            if (err) {
+                                                res.json({
+                                                    IsSuccess: false,
+                                                    ErrMsg: err
+                                                });
+                                            } else {
+                                                res.json({
+                                                    IsSuccess: true
+                                                });
+                                            };
+                                        });
+                                    });
+                                } else {
+                                    res.json({
+                                        IsSuccess: false,
+                                        ErrMsg: "no such parent"
+                                    });
+                                };
+                            });
+                        } else {
+                            FileModal.create({
+                                file_name,
+                                is_dir: true,
+                                is_root: true,
+                                user_id: user._id
+                            }).then(file => {
+                                file.path_to_current = file.guid;
+                                file.save();
+                                fs.mkdir(`public/user_content/${file.guid}`, (err, dir) => {
+                                    if (err) {
+                                        res.json({
+                                            IsSuccess: false,
+                                            ErrMsg: err
+                                        });
+                                    } else {
+                                        res.json({
+                                            IsSuccess: true
+                                        });
+                                    };
+                                });
+                            });
+                        };
+                    } else {
+                        res.json({
+                            IsSuccess: false,
+                            ErrMsg: "no such user"
+                        });
+                    };
+                });
+            } else {
+                res.json({
+                    IsSuccess: false,
+                    ErrMsg:"file_name can't be empty"
+                });
+            }
         } else {
             res.json({
                 IsSuccess: false,
