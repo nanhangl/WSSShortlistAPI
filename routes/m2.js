@@ -2,6 +2,7 @@ var express = require('express');
 var router = express.Router();
 var bcrypt = require('bcrypt');
 var jwt = require('jsonwebtoken');
+const secrets = require('../secrets');
 var User = require('../nosqlmodals/User');
 
 /* POST Login */
@@ -16,10 +17,15 @@ router.post('/Login', function (req, res, next) {
                     if (user) {
                         bcrypt.compare(user_pwd, user.user_pwd).then(passwordCorrect => {
                             if (passwordCorrect) {
+                                const token = jwt.sign({
+                                    _id: user._id,
+                                    user_no: user.user_no
+                                }, secrets.jwtSecret);
+
                                 res.json({
                                     IsSuccess: true,
                                     Result: {
-                                        
+                                        token
                                     }
                                 });
                             } else {

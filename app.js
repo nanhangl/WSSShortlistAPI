@@ -9,6 +9,7 @@ var https = require('https');
 var nosqldb = require('./nosqldb');
 
 var m2Router = require('./routes/m2');
+var m3Router = require('./routes/m3');
 
 var app = express();
 
@@ -24,7 +25,7 @@ app.use(cookieParser());
 app.use(express.static(path.join(__dirname, 'public')));
 
 app.use('/m2', m2Router);
-
+app.use('/m3', m3Router);
 
 // catch 404 and forward to error handler
 app.use(function(req, res, next) {
