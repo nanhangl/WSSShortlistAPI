@@ -169,6 +169,55 @@ router.post('/FileList', function (req, res, next) {
     };
 });
 
+/* POST DeleteFile */
+router.post('/DeleteFile', function (req, res, next) {
+    try {
+        const { file_guid } = req.body;
+        if (file_guid) {
+            FileModal.findOne({
+                guid: file_guid
+            }).then(file => {
+                if (file) {
+                    if (file.is_dir) {
+                        FileModal.deleteMany({ 
+                            "path_to_current": { $regex: file_guid } 
+                        }).then(del => {
+                            fs.rmdirSync(`public/user_content/${file.path_to_current}`);
+                            res.json({
+                                IsSuccess: true
+                            });
+                        });
+                    } else {
+                        FileModal.deleteOne({
+                            guid: file_guid
+                        }).then(del => {
+                            fs.rmSync(`public/user_content/${file.path_to_current}`);
+                            res.json({
+                                IsSuccess: true
+                            });
+                        });
+                    };
+                } else {
+                    res.json({
+                        IsSuccess: false,
+                        ErrMsg: "no such file"
+                    });
+                };
+            });
+        } else {
+            res.json({
+                IsSuccess: false,
+                ErrMsg: "file_guid can't be empty"
+            });
+        };
+    } catch (err) {
+        res.json({
+            IsSuccess: false,
+            ErrMsg: err
+        });
+    };
+});
+
 /* POST NewFolder */
 router.post('/NewFolder', function (req, res, next) {
     try {
@@ -507,4 +556,71 @@ router.post('/DownloadFile', file_upload.single('file_content'), function (req, 
 
     };
 });
+
+/* POST RenameFile */
+router.post('/RenameFile', function (req, res, next) {
+    try {
+        const { user_no, new_file_name, file_guid, parent_dir_guid } = req.body;
+        if (user_no) {
+            if (new_file_name) {
+                if (file_guid) {
+                    if (parent_dir_guid) {
+                        User.findOne({
+                            user_no
+                        }).then(user => {
+                            if (user) {
+                                FileModal.findOne({
+                                    user_id: user._id,
+                                    guid: file_guid,
+                                    parent_dir_guid
+                                }).then(file => {
+                                    if (file) {
+                                        file.file_name = new_file_name;
+                                        file.save();
+                                        res.json({
+                                            IsSuccess: true
+                                        });
+                                    } else {
+                                        res.json({
+                                            IsSuccess: false,
+                                            ErrMsg:"no such file"
+                                        });
+                                    };
+                                });
+                            } else {
+                                res.json({
+                                    IsSuccess: false,
+                                    ErrMsg:"no such user"
+                                });
+                            };
+                        });
+                    } else {
+                        res.json({
+                            IsSuccess: false,
+                            ErrMsg:"parent_dir_guid can't be empty"
+                        });
+                    };
+                } else {
+                    res.json({
+                        IsSuccess: false,
+                        ErrMsg:"file_guid can't be empty"
+                    });
+                };
+            } else {
+                res.json({
+                    IsSuccess: false,
+                    ErrMsg:"new_file_name can't be empty"
+                });
+            };
+        } else {
+            res.json({
+                IsSuccess: false,
+                ErrMsg:"user_no can't be empty"
+            });
+        };
+    } catch (err) {
+
+    };
+});
+
 module.exports = router;
