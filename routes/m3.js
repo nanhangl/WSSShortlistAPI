@@ -255,4 +255,87 @@ router.post('/NewFolder', function (req, res, next) {
     };
 });
 
+/* POST NewFile */
+router.post('/NewFile', function (req, res, next) {
+    try {
+        const { user_no, file_name, parent_dir_guid } = req.body;
+        if (user_no) {
+            if (file_name) {
+                if (parent_dir_guid) {
+                    User.findOne({
+                        user_no
+                    }).then(user => {
+                        if (user) {
+                            FileModal.findOne({
+                                guid: parent_dir_guid
+                            }).then(parent => {
+                                if (parent) {
+                                    if (parent.is_dir) {
+                                        FileModal.create({
+                                            file_name,
+                                            is_dir: false,
+                                            is_root: false,
+                                            user_id: user._id
+                                        }).then(file => {
+                                            file.path_to_current = `${parent.path_to_current}/${file.guid}`;
+                                            file.save();
+                                            fs.mkdir(`public/user_content/${parent.path_to_current}/${file.guid}`, (err, dir) => {
+                                                if (err) {
+                                                    res.json({
+                                                        IsSuccess: false,
+                                                        ErrMsg: err
+                                                    });
+                                                } else {
+                                                    res.json({
+                                                        IsSuccess: true
+                                                    });
+                                                };
+                                            });
+                                        });
+                                    } else {
+                                        res.json({
+                                            IsSuccess: false,
+                                            ErrMsg: "parent not directory"
+                                        });
+                                    }
+                                } else {
+                                    res.json({
+                                        IsSuccess: false,
+                                        ErrMsg: "no such parent"
+                                    });
+                                };
+                            });
+                        } else {
+                            res.json({
+                                IsSuccess: false,
+                                ErrMsg: "no such user"
+                            });
+                        };
+                    });
+                } else {
+                    res.json({
+                        IsSuccess: false,
+                        ErrMsg: "parent_dir_guid can't be empty"
+                    });
+                };
+            } else {
+                res.json({
+                    IsSuccess: false,
+                    ErrMsg:"file_name can't be empty"
+                });
+            }
+        } else {
+            res.json({
+                IsSuccess: false,
+                ErrMsg:"user_no can't be empty"
+            });
+        };
+    } catch (err) {
+        res.json({
+            IsSuccess: false,
+            ErrMsg: err
+        });
+    };
+});
+
 module.exports = router;
